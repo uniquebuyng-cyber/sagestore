@@ -31,6 +31,7 @@ router.post('/login', async (req, res) => {
       role: user.role,
       outlet: user.outlet,
       phone: user.phone,
+      hasPin: !!user.pin,
     },
   });
 });
@@ -93,14 +94,16 @@ router.post('/pin-login', async (req, res) => {
 
   res.json({
     token: signToken(user._id),
-    user: { _id: user._id, name: user.name, email: user.email, role: user.role, outlet: user.outlet, phone: user.phone },
+    user: { _id: user._id, name: user.name, email: user.email, role: user.role, outlet: user.outlet, phone: user.phone, hasPin: !!user.pin },
   });
 });
 
 // GET /api/auth/me
 router.get('/me', protect, async (req, res) => {
-  const user = await User.findById(req.user._id).select('-password -pin').populate('outlet', 'name address');
-  res.json(user);
+  const user = await User.findById(req.user._id).populate('outlet', 'name address');
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  const { password, pin, ...rest } = user.toObject();
+  res.json({ ...rest, hasPin: !!pin });
 });
 
 // PUT /api/auth/me — update own profile
