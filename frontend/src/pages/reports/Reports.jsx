@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { Download, BarChart3, TrendingUp, Receipt, Boxes } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Download, BarChart3, TrendingUp, Receipt, Boxes, Banknote } from 'lucide-react';
 
 const fmt = (n) => `₦${Number(n || 0).toLocaleString()}`;
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const catLabel = (c) => c?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || c;
 
 export default function Reports() {
-  const [tab, setTab] = useState('sales');
+  const [tab, setTab] = useState('stock-profit');
   const [salesData, setSalesData] = useState(null);
   const [profitData, setProfitData] = useState(null);
   const [expenseData, setExpenseData] = useState(null);
   const [inventoryData, setInventoryData] = useState(null);
+  const [stockProfitData, setStockProfitData] = useState(null);
   const [outlets, setOutlets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({ startDate: '', endDate: '', outletId: '' });
@@ -29,16 +31,18 @@ export default function Reports() {
     if (filters.endDate) params.set('endDate', filters.endDate);
     if (filters.outletId) params.set('outletId', filters.outletId);
     try {
-      const [sRes, pRes, eRes, iRes] = await Promise.all([
+      const [sRes, pRes, eRes, iRes, spRes] = await Promise.all([
         API.get(`/reports/sales?${params}`),
         API.get(`/reports/profit?${params}`),
         API.get(`/reports/expenses?${params}`),
         API.get(`/reports/inventory?${params}`),
+        API.get(`/reports/stock-profit?${params}`),
       ]);
       setSalesData(sRes.data);
       setProfitData(pRes.data);
       setExpenseData(eRes.data);
       setInventoryData(iRes.data);
+      setStockProfitData(spRes.data);
     } catch {} finally { setLoading(false); }
   };
 
@@ -49,11 +53,9 @@ export default function Reports() {
     if (filters.startDate) params.set('startDate', filters.startDate);
     if (filters.endDate) params.set('endDate', filters.endDate);
     if (filters.outletId) params.set('outletId', filters.outletId);
-    const token = localStorage.getItem('token');
     const base = import.meta.env.VITE_API_URL || '/api';
-    const url = `${base}/reports/export/sales?${params}`;
     const a = document.createElement('a');
-    a.href = url;
+    a.href = `${base}/reports/export/sales?${params}`;
     a.target = '_blank';
     document.body.appendChild(a);
     a.click();
@@ -61,6 +63,7 @@ export default function Reports() {
   };
 
   const tabs = [
+    { id: 'stock-profit', label: 'Stock Profit', icon: Banknote },
     { id: 'sales', label: 'Sales', icon: BarChart3 },
     { id: 'profit', label: 'Profit', icon: TrendingUp },
     { id: 'expenses', label: 'Expenses', icon: Receipt },
@@ -94,7 +97,7 @@ export default function Reports() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit flex-wrap">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
@@ -107,6 +110,157 @@ export default function Reports() {
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>
       ) : (
         <div className="space-y-6">
+
+          {/* ===== STOCK PROFIT TAB ===== */}
+          {tab === 'stock-profit' && stockProfitData && (
+            <>
+              {/* Big summary cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="card border-blue-200 bg-blue-50">
+                  <p className="text-xs text-blue-600 font-semibold uppercase tracking-wide">Stock Cost Value</p>
+                  <p className="text-2xl font-bold text-blue-800 mt-1">{fmt(stockProfitData.summary?.totalCost)}</p>
+                  <p className="text-xs text-blue-500 mt-1">What you paid for your stock</p>
+                </div>
+                <div className="card border-green-200 bg-green-50">
+                  <p className="text-xs text-green-600 font-semibold uppercase tracking-wide">If You Sell All Stock</p>
+                  <p className="text-2xl font-bold text-green-800 mt-1">{fmt(stockProfitData.summary?.totalRevenue)}</p>
+                  <p className="text-xs text-green-500 mt-1">Total revenue potential</p>
+                </div>
+                <div className="card border-purple-200 bg-purple-50">
+                  <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">Total Potential Profit</p>
+                  <p className="text-3xl font-bold text-purple-800 mt-1">{fmt(stockProfitData.summary?.totalProfit)}</p>
+                  <p className="text-xs text-purple-500 mt-1">Profit if all stock is sold</p>
+                </div>
+                <div className="card border-orange-200 bg-orange-50">
+                  <p className="text-xs text-orange-600 font-semibold uppercase tracking-wide">Overall Margin</p>
+                  <p className="text-3xl font-bold text-orange-800 mt-1">{stockProfitData.summary?.overallMargin}%</p>
+                  <p className="text-xs text-orange-500 mt-1">Profit margin on stock</p>
+                </div>
+              </div>
+
+              {/* By Outlet */}
+              {stockProfitData.byOutlet?.length > 0 && (
+                <div className="card">
+                  <h3 className="font-semibold text-gray-800 mb-4">Profit Potential by Outlet</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead><tr className="border-b border-gray-100">
+                        <th className="table-header">Outlet</th>
+                        <th className="table-header text-right">Stock Cost</th>
+                        <th className="table-header text-right">Revenue If Sold</th>
+                        <th className="table-header text-right">Potential Profit</th>
+                        <th className="table-header text-right">Products</th>
+                      </tr></thead>
+                      <tbody>
+                        {stockProfitData.byOutlet.map((o, i) => (
+                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                            <td className="table-cell font-semibold text-gray-800">{o.outlet || 'Unassigned'}</td>
+                            <td className="table-cell text-right text-gray-600">{fmt(o.totalCost)}</td>
+                            <td className="table-cell text-right text-blue-600 font-medium">{fmt(o.totalRevenue)}</td>
+                            <td className="table-cell text-right text-green-600 font-bold text-base">{fmt(o.potentialProfit)}</td>
+                            <td className="table-cell text-right">{o.items}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* By Category chart */}
+              {stockProfitData.byCategory?.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="card">
+                    <h3 className="font-semibold text-gray-800 mb-4">Profit by Category</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie data={stockProfitData.byCategory} dataKey="potentialProfit" nameKey="category"
+                          cx="50%" cy="50%" outerRadius={80}
+                          label={({ category, percent }) => `${catLabel(category)} ${(percent * 100).toFixed(0)}%`}>
+                          {stockProfitData.byCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={v => fmt(v)} labelFormatter={catLabel} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="card">
+                    <h3 className="font-semibold text-gray-800 mb-4">Cost vs Revenue by Category</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={stockProfitData.byCategory.map(c => ({ ...c, category: catLabel(c.category) }))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="category" tick={{ fontSize: 10 }} />
+                        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₦${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip formatter={v => fmt(v)} />
+                        <Bar dataKey="totalCost" fill="#94a3b8" name="Cost" radius={[4,4,0,0]} />
+                        <Bar dataKey="totalRevenue" fill="#3b82f6" name="Revenue" radius={[4,4,0,0]} />
+                        <Bar dataKey="potentialProfit" fill="#10b981" name="Profit" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Per product table */}
+              {stockProfitData.items?.length > 0 && (
+                <div className="card p-0 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="font-semibold text-gray-800">Profit Per Product (Ranked by Profit)</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          <th className="table-header">#</th>
+                          <th className="table-header">Product</th>
+                          <th className="table-header">Outlet</th>
+                          <th className="table-header text-right">Qty</th>
+                          <th className="table-header text-right">Cost Price</th>
+                          <th className="table-header text-right">Sell Price</th>
+                          <th className="table-header text-right">Margin</th>
+                          <th className="table-header text-right">Potential Profit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {stockProfitData.items.map((item, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="table-cell text-gray-400 text-xs">{i + 1}</td>
+                            <td className="table-cell">
+                              <p className="font-medium text-gray-800">{item.product}</p>
+                              {item.brand && <p className="text-xs text-gray-400">{item.brand}</p>}
+                            </td>
+                            <td className="table-cell text-gray-500 text-sm">{item.outlet || '—'}</td>
+                            <td className="table-cell text-right font-medium">{item.quantity} <span className="text-xs text-gray-400">{item.unit}</span></td>
+                            <td className="table-cell text-right text-gray-500">{fmt(item.costPrice)}</td>
+                            <td className="table-cell text-right text-blue-600">{fmt(item.sellingPrice)}</td>
+                            <td className="table-cell text-right">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${Number(item.margin) >= 20 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {item.margin}%
+                              </span>
+                            </td>
+                            <td className="table-cell text-right font-bold text-green-600">{fmt(item.potentialProfit)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                        <tr>
+                          <td colSpan={7} className="table-cell font-bold text-gray-800">TOTAL POTENTIAL PROFIT</td>
+                          <td className="table-cell text-right font-bold text-green-600 text-lg">{fmt(stockProfitData.summary?.totalProfit)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {stockProfitData.items?.length === 0 && (
+                <div className="card text-center py-16">
+                  <Banknote size={40} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500">No stock data yet. Add inventory first.</p>
+                </div>
+              )}
+            </>
+          )}
+
           {/* Sales Tab */}
           {tab === 'sales' && salesData && (
             <>
@@ -179,7 +333,8 @@ export default function Reports() {
                   <h3 className="font-semibold text-gray-800 mb-4">By Category</h3>
                   <ResponsiveContainer width="100%" height={220}>
                     <PieChart>
-                      <Pie data={expenseData.byCategory} dataKey="total" nameKey="_id" cx="50%" cy="50%" outerRadius={80} label={({ _id, percent }) => `${_id?.replace('_', ' ')} ${(percent*100).toFixed(0)}%`}>
+                      <Pie data={expenseData.byCategory} dataKey="total" nameKey="_id" cx="50%" cy="50%" outerRadius={80}
+                        label={({ _id, percent }) => `${catLabel(_id)} ${(percent*100).toFixed(0)}%`}>
                         {expenseData.byCategory.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={v => fmt(v)} />
@@ -222,6 +377,7 @@ export default function Reports() {
               </div>
             </>
           )}
+
         </div>
       )}
     </div>

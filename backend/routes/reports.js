@@ -198,4 +198,68 @@ router.get('/export/sales', protect, authorize('owner', 'manager'), async (req, 
   }
 });
 
+// GET /api/reports/stock-profit — potential profit from current stock
+router.get('/stock-profit', protect, authorize('owner', 'manager'), async (req, res) => {
+  const { outletId } = req.query;
+  const filter = {};
+  if (req.user.role === 'manager') filter.outlet = req.user.outlet;
+  else if (outletId) filter.outlet = outletId;
+
+  const inventory = await OutletInventory.find(filter)
+    .populate('product', 'name category brand sku costPrice sellingPrice unit')
+    .populate('outlet', 'name');
+
+  const items = inventory
+    .filter(i => i.product && i.quantity > 0)
+    .map(i => ({
+      product: i.product.name,
+      brand: i.product.brand || '',
+      category: i.product.category,
+      sku: i.product.sku || '',
+      outlet: i.outlet?.name || '',
+      unit: i.product.unit,
+      quantity: i.quantity,
+      costPrice: i.product.costPrice,
+      sellingPrice: i.product.sellingPrice,
+      totalCost: i.quantity * i.product.costPrice,
+      totalRevenue: i.quantity * i.product.sellingPrice,
+      potentialProfit: i.quantity * (i.product.sellingPrice - i.product.costPrice),
+      margin: i.product.sellingPrice > 0
+        ? (((i.product.sellingPrice - i.product.costPrice) / i.product.sellingPrice) * 100).toFixed(1)
+        : '0',
+    }))
+    .sort((a, b) => b.potentialProfit - a.potentialProfit);
+
+  // Group by outlet
+  const byOutlet = {};
+  items.forEach(i => {
+    if (!byOutlet[i.outlet]) byOutlet[i.outlet] = { outlet: i.outlet, totalCost: 0, totalRevenue: 0, potentialProfit: 0, items: 0 };
+    byOutlet[i.outlet].totalCost += i.totalCost;
+    byOutlet[i.outlet].totalRevenue += i.totalRevenue;
+    byOutlet[i.outlet].potentialProfit += i.potentialProfit;
+    byOutlet[i.outlet].items += 1;
+  });
+
+  // Group by category
+  const byCategory = {};
+  items.forEach(i => {
+    if (!byCategory[i.category]) byCategory[i.category] = { category: i.category, totalCost: 0, totalRevenue: 0, potentialProfit: 0 };
+    byCategory[i.category].totalCost += i.totalCost;
+    byCategory[i.category].totalRevenue += i.totalRevenue;
+    byCategory[i.category].potentialProfit += i.potentialProfit;
+  });
+
+  const totalCost = items.reduce((s, i) => s + i.totalCost, 0);
+  const totalRevenue = items.reduce((s, i) => s + i.totalRevenue, 0);
+  const totalProfit = items.reduce((s, i) => s + i.potentialProfit, 0);
+  const overallMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0';
+
+  res.json({
+    summary: { totalCost, totalRevenue, totalProfit, overallMargin },
+    items,
+    byOutlet: Object.values(byOutlet),
+    byCategory: Object.values(byCategory),
+  });
+});
+
 module.exports = router;
