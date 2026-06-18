@@ -111,7 +111,8 @@ export default function Products() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [modal, setModal] = useState(null);
-  const { canApprove, isOwner, isWorker } = useAuth();
+  const [stockMap, setStockMap] = useState({});
+  const { canApprove, isOwner, isWorker, user } = useAuth();
 
   const load = async () => {
     try {
@@ -120,6 +121,16 @@ export default function Products() {
       if (category) params.set('category', category);
       const { data } = await API.get(`/products?${params}`);
       setProducts(data);
+
+      // For workers: also fetch their outlet's stock so we can show qty per product
+      if (isWorker && user?.outlet?._id) {
+        const invRes = await API.get(`/inventory?outletId=${user.outlet._id}`);
+        const map = {};
+        invRes.data.forEach(item => {
+          if (item.product?._id) map[item.product._id] = item.quantity;
+        });
+        setStockMap(map);
+      }
     } catch {} finally { setLoading(false); }
   };
 
@@ -154,26 +165,47 @@ export default function Products() {
       ) : products.length === 0 ? (
         <div className="card text-center py-16"><Package size={40} className="mx-auto text-gray-300 mb-3" /><p className="text-gray-500">No products found</p></div>
       ) : isWorker ? (
-        /* Worker view — clean simple list, no prices hidden */
+        /* Worker view — clean simple list */
         <div className="space-y-2">
-          {products.map(p => (
-            <div key={p._id} className="bg-white border border-gray-100 rounded-xl flex items-center gap-3 p-3 shadow-sm">
-              {p.image
-                ? <img src={p.image} alt={p.name} className="w-14 h-14 object-cover rounded-lg shrink-0" />
-                : <div className="w-14 h-14 bg-blue-50 rounded-lg flex items-center justify-center shrink-0"><Package size={22} className="text-blue-400" /></div>}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 truncate">{p.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {[p.brand, catLabel(p.category)].filter(Boolean).join(' · ')}
-                </p>
+          {user?.outlet?.name && (
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">
+              Stock at {user.outlet.name}
+            </p>
+          )}
+          {products.map(p => {
+            const qty = stockMap[p._id];
+            const hasStock = qty !== undefined;
+            const isLow = hasStock && qty <= (p.lowStockLevel || 5);
+            const outOfStock = hasStock && qty === 0;
+            return (
+              <div key={p._id} className={`bg-white border rounded-xl flex items-center gap-3 p-3 shadow-sm ${outOfStock ? 'border-red-200 bg-red-50/30' : isLow ? 'border-orange-200 bg-orange-50/30' : 'border-gray-100'}`}>
+                {p.image
+                  ? <img src={p.image} alt={p.name} className="w-14 h-14 object-cover rounded-lg shrink-0" />
+                  : <div className="w-14 h-14 bg-blue-50 rounded-lg flex items-center justify-center shrink-0"><Package size={22} className="text-blue-400" /></div>}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 truncate">{p.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {[p.brand, catLabel(p.category)].filter(Boolean).join(' · ')}
+                  </p>
+                  {hasStock && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        outOfStock ? 'bg-red-100 text-red-700' :
+                        isLow ? 'bg-orange-100 text-orange-700' :
+                        'bg-green-100 text-green-700'}`}>
+                        {outOfStock ? 'Out of Stock' : `${qty} ${p.unit} left`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-gray-400 mb-0.5">Price</p>
+                  <p className="font-bold text-blue-600 text-lg">{fmt(p.sellingPrice)}</p>
+                  <p className="text-xs text-gray-400">per {p.unit}</p>
+                </div>
               </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-gray-400 mb-0.5">Selling Price</p>
-                <p className="font-bold text-blue-600 text-base">{fmt(p.sellingPrice)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">per {p.unit}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         /* Owner / Manager view — full cards with cost, margin, SKU */
