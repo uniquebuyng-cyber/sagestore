@@ -78,7 +78,7 @@ router.get('/profit', protect, authorize('owner', 'manager'), async (req, res) =
     { $match: saleMatch },
     { $group: { _id: '$outlet', revenue: { $sum: '$totalAmount' }, grossProfit: { $sum: '$totalProfit' } } },
     { $lookup: { from: 'outlets', localField: '_id', foreignField: '_id', as: 'outlet' } },
-    { $unwind: { path: '$outlet', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$outlet', preserveNullAndEmptyArrays: true } },
     { $project: { outletName: '$outlet.name', revenue: 1, grossProfit: 1 } },
   ]);
 
@@ -108,7 +108,7 @@ router.get('/expenses', protect, authorize('owner', 'manager'), async (req, res)
     { $match: match },
     { $group: { _id: '$outlet', total: { $sum: '$amount' }, count: { $sum: 1 } } },
     { $lookup: { from: 'outlets', localField: '_id', foreignField: '_id', as: 'outlet' } },
-    { $unwind: { path: '$outlet', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$outlet', preserveNullAndEmptyArrays: true } },
     { $project: { outletName: '$outlet.name', total: 1, count: 1 } },
   ]);
 

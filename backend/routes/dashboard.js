@@ -60,7 +60,7 @@ router.get('/', protect, authorize('owner', 'manager'), async (req, res) => {
       { $match: { status: 'approved', saleDate: { $gte: startOfMonth } } },
       { $group: { _id: '$outlet', revenue: { $sum: '$totalAmount' }, profit: { $sum: '$totalProfit' }, count: { $sum: 1 } } },
       { $lookup: { from: 'outlets', localField: '_id', foreignField: '_id', as: 'outlet' } },
-      { $unwind: { path: '$outlet', preserveNullAndEmpty: true } },
+      { $unwind: { path: '$outlet', preserveNullAndEmptyArrays: true } },
       { $project: { outletName: '$outlet.name', revenue: 1, profit: 1, count: 1 } },
     ]);
   }
