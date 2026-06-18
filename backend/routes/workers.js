@@ -59,6 +59,28 @@ router.patch('/:id/reset-password', protect, authorize('owner'), async (req, res
   res.json({ message: 'Password reset successfully' });
 });
 
+// PATCH /api/workers/:id/set-pin — owner sets PIN for a worker
+router.patch('/:id/set-pin', protect, authorize('owner'), async (req, res) => {
+  const { pin } = req.body;
+  if (!pin || !/^\d{4}$/.test(pin)) return res.status(400).json({ message: 'PIN must be exactly 4 digits' });
+
+  const worker = await User.findById(req.params.id);
+  if (!worker) return res.status(404).json({ message: 'Worker not found' });
+  if (worker.role === 'owner') return res.status(403).json({ message: 'Cannot set PIN for owner this way' });
+
+  worker.pin = pin;
+  await worker.save();
+  await log({ action: 'PIN_SET', entity: 'User', entityId: worker._id, performedBy: req.user._id });
+
+  res.json({ message: 'PIN set successfully' });
+});
+
+// PATCH /api/workers/:id/remove-pin — owner removes PIN for a worker
+router.patch('/:id/remove-pin', protect, authorize('owner'), async (req, res) => {
+  await User.findByIdAndUpdate(req.params.id, { pin: null });
+  res.json({ message: 'PIN removed' });
+});
+
 // DELETE /api/workers/:id — soft delete
 router.delete('/:id', protect, authorize('owner'), async (req, res) => {
   const worker = await User.findById(req.params.id);

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Plus, Users, Edit2, Trash2, X, Key, UserCheck, UserX } from 'lucide-react';
+import { Plus, Users, Edit2, X, Key, UserX, Smartphone } from 'lucide-react';
 
 function WorkerModal({ worker, outlets, onClose, onSaved }) {
   const isNew = !worker?._id;
@@ -70,6 +70,60 @@ function WorkerModal({ worker, outlets, onClose, onSaved }) {
   );
 }
 
+function SetPinModal({ worker, onClose }) {
+  const [pin, setPin] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    if (!/^\d{4}$/.test(pin)) { toast.error('PIN must be exactly 4 digits'); return; }
+    setLoading(true);
+    try {
+      await API.patch(`/workers/${worker._id}/set-pin`, { pin });
+      toast.success(`PIN set for ${worker.name}. Give them: ${pin}`);
+      onClose();
+    } catch (err) { toast.error(err.response?.data?.message || 'Error'); }
+    finally { setLoading(false); }
+  };
+
+  const handleRemove = async () => {
+    if (!confirm(`Remove PIN for ${worker.name}?`)) return;
+    setLoading(true);
+    try {
+      await API.patch(`/workers/${worker._id}/remove-pin`);
+      toast.success('PIN removed');
+      onClose();
+    } catch { toast.error('Error removing PIN'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900">Set PIN for {worker.name}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          Set a 4-digit PIN. The worker will use this PIN + their email to log in on their phone.
+        </p>
+        <input
+          type="text" inputMode="numeric" maxLength={4}
+          className="input text-center text-3xl tracking-[0.6em] font-bold mb-1"
+          placeholder="0000"
+          value={pin}
+          onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+        <p className="text-xs text-gray-400 text-center mb-5">Type any 4-digit number</p>
+        <div className="flex gap-3">
+          <button onClick={handleRemove} disabled={loading} className="btn-secondary flex-1 text-sm">Remove PIN</button>
+          <button onClick={handleSave} disabled={loading || pin.length !== 4} className="btn-primary flex-1">
+            {loading ? 'Saving...' : 'Set PIN'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResetPasswordModal({ workerId, onClose }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -97,6 +151,7 @@ export default function Workers() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [resetId, setResetId] = useState(null);
+  const [pinWorker, setPinWorker] = useState(null);
   const [filterOutlet, setFilterOutlet] = useState('');
   const { isOwner } = useAuth();
 
@@ -168,6 +223,7 @@ export default function Workers() {
                       <div className="flex items-center gap-1">
                         <button onClick={() => setModal(w)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><Edit2 size={14} /></button>
                         <button onClick={() => setResetId(w._id)} className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg" title="Reset password"><Key size={14} /></button>
+                        <button onClick={() => setPinWorker(w)} className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Set PIN"><Smartphone size={14} /></button>
                         {w.isActive && <button onClick={() => handleDeactivate(w._id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Deactivate"><UserX size={14} /></button>}
                       </div>
                     </td>
@@ -181,6 +237,7 @@ export default function Workers() {
 
       {modal !== null && <WorkerModal worker={modal._id ? modal : null} outlets={outlets} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(); }} />}
       {resetId && <ResetPasswordModal workerId={resetId} onClose={() => { setResetId(null); }} />}
+      {pinWorker && <SetPinModal worker={pinWorker} onClose={() => setPinWorker(null)} />}
     </div>
   );
 }
