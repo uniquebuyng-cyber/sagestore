@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Receipt, Boxes, Plus } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Receipt, Boxes, Plus, Package } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function MobileNav() {
@@ -10,11 +10,17 @@ export default function MobileNav() {
   if (isWorker) {
     return (
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 safe-bottom">
-        <div className="grid grid-cols-3 h-16">
+        <div className="grid grid-cols-4 h-16">
           <NavLink to="/dashboard" className={({ isActive }) =>
             `flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
             <LayoutDashboard size={20} />
             <span>Home</span>
+          </NavLink>
+
+          <NavLink to="/products" className={({ isActive }) =>
+            `flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+            <Package size={20} />
+            <span>Products</span>
           </NavLink>
 
           <button onClick={() => navigate('/sales/new')} className="flex flex-col items-center justify-center">
