@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -19,6 +19,7 @@ export default function NewSale() {
   const [loading, setLoading] = useState(false);
   const { user, isOwner } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     Promise.all([API.get('/products'), API.get('/outlets')]).then(([pRes, oRes]) => {
@@ -26,6 +27,15 @@ export default function NewSale() {
       setOutlets(oRes.data);
       const oid = !isOwner && user?.outlet ? (user.outlet._id || user.outlet) : (oRes.data.length === 1 ? oRes.data[0]._id : '');
       if (oid) setOutletId(oid);
+
+      // Pre-select product from URL ?productId=xxx
+      const preId = searchParams.get('productId');
+      if (preId) {
+        const product = pRes.data.find(p => p._id === preId);
+        if (product) {
+          setItems([{ productId: product._id, quantity: 1, sellingPrice: product.sellingPrice, productName: product.name }]);
+        }
+      }
     }).catch(() => {});
   }, []);
 

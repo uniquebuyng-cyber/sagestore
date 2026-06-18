@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Plus, Package, Search, Edit2, Trash2, X, Image } from 'lucide-react';
+import { Plus, Package, Search, Edit2, Trash2, X, Image, ShoppingCart } from 'lucide-react';
 
 const CATEGORIES = [
   { value: 'engine_oil', label: 'Engine Oil' },
@@ -113,6 +114,7 @@ export default function Products() {
   const [modal, setModal] = useState(null);
   const [stockMap, setStockMap] = useState({});
   const { canApprove, isOwner, isWorker, user } = useAuth();
+  const navigate = useNavigate();
 
   const load = async () => {
     try {
@@ -178,31 +180,39 @@ export default function Products() {
             const isLow = hasStock && qty <= (p.lowStockLevel || 5);
             const outOfStock = hasStock && qty === 0;
             return (
-              <div key={p._id} className={`bg-white border rounded-xl flex items-center gap-3 p-3 shadow-sm ${outOfStock ? 'border-red-200 bg-red-50/30' : isLow ? 'border-orange-200 bg-orange-50/30' : 'border-gray-100'}`}>
-                {p.image
-                  ? <img src={p.image} alt={p.name} className="w-14 h-14 object-cover rounded-lg shrink-0" />
-                  : <div className="w-14 h-14 bg-blue-50 rounded-lg flex items-center justify-center shrink-0"><Package size={22} className="text-blue-400" /></div>}
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{p.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {[p.brand, catLabel(p.category)].filter(Boolean).join(' · ')}
-                  </p>
-                  {hasStock && (
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+              <div key={p._id} className={`bg-white border rounded-xl p-3 shadow-sm ${outOfStock ? 'border-red-200 bg-red-50/30' : isLow ? 'border-orange-200 bg-orange-50/30' : 'border-gray-100'}`}>
+                <div className="flex items-center gap-3">
+                  {p.image
+                    ? <img src={p.image} alt={p.name} className="w-14 h-14 object-cover rounded-lg shrink-0" />
+                    : <div className="w-14 h-14 bg-blue-50 rounded-lg flex items-center justify-center shrink-0"><Package size={22} className="text-blue-400" /></div>}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{p.name}</p>
+                    <p className="text-xs text-gray-400">{[p.brand, catLabel(p.category)].filter(Boolean).join(' · ')}</p>
+                    {hasStock && (
+                      <span className={`inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full ${
                         outOfStock ? 'bg-red-100 text-red-700' :
                         isLow ? 'bg-orange-100 text-orange-700' :
                         'bg-green-100 text-green-700'}`}>
                         {outOfStock ? 'Out of Stock' : `${qty} ${p.unit} left`}
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-blue-600 text-base">{fmt(p.sellingPrice)}</p>
+                    <p className="text-xs text-gray-400">per {p.unit}</p>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs text-gray-400 mb-0.5">Price</p>
-                  <p className="font-bold text-blue-600 text-lg">{fmt(p.sellingPrice)}</p>
-                  <p className="text-xs text-gray-400">per {p.unit}</p>
-                </div>
+                {/* Quick sell button */}
+                <button
+                  onClick={() => navigate(`/sales/new?productId=${p._id}`)}
+                  disabled={outOfStock}
+                  className={`mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                    outOfStock
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                  <ShoppingCart size={15} />
+                  {outOfStock ? 'Out of Stock' : 'Sell This Product'}
+                </button>
               </div>
             );
           })}
