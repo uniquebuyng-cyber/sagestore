@@ -108,4 +108,37 @@ router.get('/', protect, authorize('owner', 'manager'), async (req, res) => {
   });
 });
 
+// GET /api/dashboard/worker — worker-only stats
+router.get('/worker', protect, async (req, res) => {
+  const now = new Date();
+  const startOfDay = new Date(now); startOfDay.setHours(0,0,0,0);
+  const endOfDay = new Date(now); endOfDay.setHours(23,59,59,999);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const base = { worker: req.user._id };
+
+  const [todayCount, pendingCount, rejectedCount, monthSales, recentSales] = await Promise.all([
+    Sale.countDocuments({ ...base, saleDate: { $gte: startOfDay, $lte: endOfDay } }),
+    Sale.countDocuments({ ...base, status: 'pending' }),
+    Sale.countDocuments({ ...base, status: 'rejected' }),
+    Sale.aggregate([
+      { $match: { ...base, status: 'approved', saleDate: { $gte: startOfMonth } } },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$totalAmount' } } },
+    ]),
+    Sale.find(base)
+      .sort({ createdAt: -1 }).limit(5)
+      .populate('outlet', 'name')
+      .populate('items.product', 'name'),
+  ]);
+
+  res.json({
+    todayCount,
+    pendingCount,
+    rejectedCount,
+    monthCount: monthSales[0]?.count || 0,
+    monthTotal: monthSales[0]?.total || 0,
+    recentSales,
+  });
+});
+
 module.exports = router;

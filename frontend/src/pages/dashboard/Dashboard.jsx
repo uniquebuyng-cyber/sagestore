@@ -5,7 +5,7 @@ import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import {
   TrendingUp, ShoppingCart, Receipt, Package, AlertTriangle,
-  Clock, Banknote, BarChart2, Store
+  Clock, Banknote, BarChart2, Store, CheckCircle, XCircle, CalendarDays, Plus
 } from 'lucide-react';
 
 function StatCard({ icon: Icon, label, value, sub, color = 'blue', link }) {
@@ -35,6 +35,109 @@ function StatCard({ icon: Icon, label, value, sub, color = 'blue', link }) {
 
 const fmt = (n) => `₦${Number(n || 0).toLocaleString()}`;
 
+function WorkerDashboard({ user }) {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    API.get('/dashboard/worker').then(r => setStats(r.data)).catch(() => {});
+  }, []);
+
+  const today = new Date().toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return (
+    <div className="space-y-5">
+      {/* Greeting */}
+      <div className="bg-blue-600 rounded-2xl p-5 text-white">
+        <p className="text-blue-200 text-sm">{today}</p>
+        <h2 className="text-2xl font-bold mt-1">Hi, {user?.name?.split(' ')[0]} 👋</h2>
+        {user?.outlet?.name && <p className="text-blue-200 text-sm mt-1">{user.outlet.name}</p>}
+      </div>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarDays size={16} className="text-blue-500" />
+              <span className="text-xs text-gray-500 font-medium">Today's Sales</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.todayCount}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock size={16} className="text-yellow-500" />
+              <span className="text-xs text-gray-500 font-medium">Pending</span>
+            </div>
+            <p className="text-3xl font-bold text-yellow-600">{stats.pendingCount}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-100 p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle size={16} className="text-green-500" />
+              <span className="text-xs text-gray-500 font-medium">This Month</span>
+            </div>
+            <p className="text-3xl font-bold text-green-600">{stats.monthCount}</p>
+          </div>
+          <div className={`rounded-xl border p-4 ${stats.rejectedCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-100'}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <XCircle size={16} className="text-red-500" />
+              <span className="text-xs text-gray-500 font-medium">Rejected</span>
+            </div>
+            <p className={`text-3xl font-bold ${stats.rejectedCount > 0 ? 'text-red-600' : 'text-gray-900'}`}>{stats.rejectedCount}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <Link to="/sales/new"
+        className="flex items-center gap-4 p-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl transition-colors shadow-md">
+        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+          <Plus size={26} />
+        </div>
+        <div>
+          <p className="font-bold text-lg">Record a Sale</p>
+          <p className="text-blue-100 text-sm">Tap here to enter a new sale</p>
+        </div>
+      </Link>
+
+      <Link to="/sales"
+        className="flex items-center gap-4 p-4 bg-white border-2 border-gray-100 hover:border-blue-200 rounded-2xl transition-colors">
+        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
+          <ShoppingCart size={20} className="text-green-600" />
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800">My Sales</p>
+          <p className="text-gray-400 text-sm">View your submitted sales</p>
+        </div>
+      </Link>
+
+      {/* Recent sales */}
+      {stats?.recentSales?.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Recent Sales</p>
+          <div className="space-y-2">
+            {stats.recentSales.map(s => (
+              <div key={s._id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">
+                    {s.items?.map(i => i.product?.name).filter(Boolean).join(', ') || 'Sale'}
+                  </p>
+                  <p className="text-xs text-gray-400">{new Date(s.saleDate || s.createdAt).toLocaleDateString()}</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  s.status === 'approved' ? 'bg-green-100 text-green-700' :
+                  s.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'}`}>
+                  {s.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,41 +151,7 @@ export default function Dashboard() {
     }
   }, []);
 
-  if (isWorker) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 space-y-6">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <ShoppingCart size={30} className="text-white" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900">Hi, {user?.name?.split(' ')[0]}</h2>
-          <p className="text-gray-500 text-sm mt-1">What would you like to do?</p>
-        </div>
-        <div className="w-full max-w-sm space-y-3">
-          <Link to="/sales/new"
-            className="flex items-center gap-4 p-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl transition-colors shadow-md">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-              <ShoppingCart size={24} />
-            </div>
-            <div>
-              <p className="font-bold text-lg">Record a Sale</p>
-              <p className="text-blue-100 text-sm">Tap to enter new sale</p>
-            </div>
-          </Link>
-          <Link to="/sales"
-            className="flex items-center gap-4 p-5 bg-white border-2 border-gray-100 hover:border-blue-200 rounded-2xl transition-colors shadow-sm">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
-              <BarChart2 size={24} className="text-green-600" />
-            </div>
-            <div>
-              <p className="font-bold text-gray-800 text-lg">My Sales</p>
-              <p className="text-gray-500 text-sm">See approved / pending</p>
-            </div>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  if (isWorker) return <WorkerDashboard user={user} />;
 
   if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>;
   if (!data) return <p className="text-gray-500 text-center py-20">Could not load dashboard</p>;
