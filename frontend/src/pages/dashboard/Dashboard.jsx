@@ -181,19 +181,21 @@ function AdminMobileDashboard({ user, mobileData: data, onReload }) {
 
   useEffect(() => {
     if (!data || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    if (sessionStorage.getItem('sage_notif_fired')) return;
-    sessionStorage.setItem('sage_notif_fired', '1');
+    const NOTIF_KEY = 'sage_last_notif';
+    const last = parseInt(localStorage.getItem(NOTIF_KEY) || '0');
+    if (Date.now() - last < 60 * 60 * 1000) return; // max once per hour
+    localStorage.setItem(NOTIF_KEY, String(Date.now()));
     if (data.pendingCount > 0) {
       new Notification('Sage Store', {
         body: `${data.pendingCount} sale${data.pendingCount > 1 ? 's' : ''} need payment confirmation`,
         icon: '/icon-192.png',
-        tag: 'pending-sales',
+        tag: 'sage-alert',
       });
     } else if (data.lowStock?.length > 0) {
       new Notification('Sage Store — Low Stock', {
         body: `${data.lowStock.length} product${data.lowStock.length > 1 ? 's' : ''} running low`,
         icon: '/icon-192.png',
-        tag: 'low-stock',
+        tag: 'sage-alert',
       });
     }
   }, [data]);
