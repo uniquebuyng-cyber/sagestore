@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, ChevronDown } from 'lucide-react';
+import { Menu, Bell, ChevronDown, KeyRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../api/axios';
 import { formatDistanceToNow } from 'date-fns';
+import toast from 'react-hot-toast';
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth();
@@ -12,6 +13,9 @@ export default function Header({ onMenuClick }) {
   const [unread, setUnread] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showUser, setShowUser] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinLoading, setPinLoading] = useState(false);
   const notifRef = useRef(null);
 
   useEffect(() => {
@@ -46,6 +50,21 @@ export default function Header({ onMenuClick }) {
     await API.patch('/notifications/read-all').catch(() => {});
     setNotifications(n => n.map(x => ({ ...x, isRead: true })));
     setUnread(0);
+  };
+
+  const savePin = async () => {
+    if (!/^\d{4}$/.test(pinInput)) { toast.error('PIN must be exactly 4 digits'); return; }
+    setPinLoading(true);
+    try {
+      await API.put('/auth/set-pin', { pin: pinInput });
+      toast.success('PIN set! You can now log in with your PIN.');
+      setShowPinModal(false);
+      setPinInput('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to set PIN');
+    } finally {
+      setPinLoading(false);
+    }
   };
 
   return (
@@ -109,6 +128,10 @@ export default function Header({ onMenuClick }) {
                 <p className="text-sm font-medium">{user?.name}</p>
                 <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
               </div>
+              <button onClick={() => { setShowPinModal(true); setShowUser(false); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                <KeyRound size={14} /> Set PIN Login
+              </button>
               <button onClick={() => { logout(); navigate('/login'); setShowUser(false); }} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
                 Logout
               </button>
@@ -117,5 +140,26 @@ export default function Header({ onMenuClick }) {
         </div>
       </div>
     </header>
+
+    {/* PIN setup modal */}
+    {showPinModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+          <h3 className="text-lg font-semibold mb-1">Set Your PIN</h3>
+          <p className="text-sm text-gray-500 mb-5">Choose a 4-digit PIN to log in quickly on your phone.</p>
+          <input
+            type="password" inputMode="numeric" maxLength={4}
+            className="input text-center text-2xl tracking-[0.5em] mb-4"
+            placeholder="••••" value={pinInput}
+            onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+          <div className="flex gap-3">
+            <button onClick={() => { setShowPinModal(false); setPinInput(''); }}
+              className="btn-secondary flex-1">Cancel</button>
+            <button onClick={savePin} disabled={pinLoading || pinInput.length !== 4}
+              className="btn-primary flex-1">{pinLoading ? 'Saving...' : 'Save PIN'}</button>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }

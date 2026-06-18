@@ -76,9 +76,30 @@ router.post('/setup', async (req, res) => {
   });
 });
 
+// POST /api/auth/pin-login
+router.post('/pin-login', async (req, res) => {
+  const { email, pin } = req.body;
+  if (!email || !pin) return res.status(400).json({ message: 'Email and PIN required' });
+  if (!/^\d{4}$/.test(pin)) return res.status(400).json({ message: 'PIN must be 4 digits' });
+
+  const user = await User.findOne({ email }).populate('outlet', 'name address');
+  if (!user || !user.isActive) return res.status(401).json({ message: 'Invalid credentials' });
+  if (!user.pin) return res.status(400).json({ message: 'No PIN set. Please log in with your password first.' });
+
+  const match = await user.matchPin(pin);
+  if (!match) return res.status(401).json({ message: 'Incorrect PIN' });
+
+  await log({ action: 'USER_PIN_LOGIN', entity: 'User', entityId: user._id, performedBy: user._id, outlet: user.outlet?._id });
+
+  res.json({
+    token: signToken(user._id),
+    user: { _id: user._id, name: user.name, email: user.email, role: user.role, outlet: user.outlet, phone: user.phone },
+  });
+});
+
 // GET /api/auth/me
 router.get('/me', protect, async (req, res) => {
-  const user = await User.findById(req.user._id).select('-password').populate('outlet', 'name address');
+  const user = await User.findById(req.user._id).select('-password -pin').populate('outlet', 'name address');
   res.json(user);
 });
 
@@ -91,6 +112,22 @@ router.put('/me', protect, async (req, res) => {
   if (password) user.password = password;
   await user.save();
   res.json({ message: 'Profile updated', user: { _id: user._id, name: user.name, email: user.email, role: user.role } });
+});
+
+// PUT /api/auth/set-pin — set or change own PIN
+router.put('/set-pin', protect, async (req, res) => {
+  const { pin } = req.body;
+  if (!pin || !/^\d{4}$/.test(pin)) return res.status(400).json({ message: 'PIN must be exactly 4 digits' });
+  const user = await User.findById(req.user._id);
+  user.pin = pin;
+  await user.save();
+  res.json({ message: 'PIN set successfully' });
+});
+
+// DELETE /api/auth/remove-pin — remove PIN
+router.delete('/remove-pin', protect, async (req, res) => {
+  await User.findByIdAndUpdate(req.user._id, { pin: null });
+  res.json({ message: 'PIN removed' });
 });
 
 module.exports = router;
