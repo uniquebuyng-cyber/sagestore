@@ -111,7 +111,7 @@ export default function Products() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [modal, setModal] = useState(null);
-  const { canApprove, isOwner } = useAuth();
+  const { canApprove, isOwner, isWorker } = useAuth();
 
   const load = async () => {
     try {
@@ -153,7 +153,30 @@ export default function Products() {
         <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" /></div>
       ) : products.length === 0 ? (
         <div className="card text-center py-16"><Package size={40} className="mx-auto text-gray-300 mb-3" /><p className="text-gray-500">No products found</p></div>
+      ) : isWorker ? (
+        /* Worker view — clean simple list, no prices hidden */
+        <div className="space-y-2">
+          {products.map(p => (
+            <div key={p._id} className="bg-white border border-gray-100 rounded-xl flex items-center gap-3 p-3 shadow-sm">
+              {p.image
+                ? <img src={p.image} alt={p.name} className="w-14 h-14 object-cover rounded-lg shrink-0" />
+                : <div className="w-14 h-14 bg-blue-50 rounded-lg flex items-center justify-center shrink-0"><Package size={22} className="text-blue-400" /></div>}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 truncate">{p.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {[p.brand, catLabel(p.category)].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xs text-gray-400 mb-0.5">Selling Price</p>
+                <p className="font-bold text-blue-600 text-base">{fmt(p.sellingPrice)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">per {p.unit}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        /* Owner / Manager view — full cards with cost, margin, SKU */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.map(p => (
             <div key={p._id} className="card hover:shadow-md transition-shadow">
