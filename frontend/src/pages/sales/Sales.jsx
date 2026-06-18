@@ -69,7 +69,7 @@ export default function Sales() {
   const handleApprove = async (id) => {
     try {
       await API.patch(`/sales/${id}/approve`);
-      toast.success('Sale approved');
+      toast.success('Payment confirmed');
       load();
     } catch (err) { toast.error(err.response?.data?.message || 'Error'); }
   };
@@ -147,7 +147,7 @@ export default function Sales() {
                   {canApprove && <p className="text-sm text-green-600 font-medium">Profit: {fmt(sale.totalProfit)}</p>}
                   {canApprove && sale.status === 'pending' && (
                     <div className="flex gap-2 mt-3">
-                      <button onClick={() => handleApprove(sale._id)} className="btn-success flex items-center gap-1 text-xs py-1.5 px-3"><CheckCircle size={13} /> Approve</button>
+                      <button onClick={() => handleApprove(sale._id)} className="btn-success flex items-center gap-1 text-xs py-1.5 px-3"><CheckCircle size={13} /> Confirm Payment</button>
                       <button onClick={() => setRejectId(sale._id)} className="btn-danger flex items-center gap-1 text-xs py-1.5 px-3"><XCircle size={13} /> Reject</button>
                     </div>
                   )}

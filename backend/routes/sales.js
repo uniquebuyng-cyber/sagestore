@@ -119,62 +119,76 @@ router.post('/', protect, async (req, res) => {
     status: 'pending',
   });
 
-  await notifyOwners('sale_pending', 'New Sale Pending Approval', `A sale of ₦${totalAmount.toLocaleString()} requires your approval`, outlet, sale._id);
-  await log({ action: 'SALE_CREATED', entity: 'Sale', entityId: sale._id, performedBy: req.user._id, outlet, details: { totalAmount, items: items.length } });
-
-  res.status(201).json(sale);
-});
-
-// PATCH /api/sales/:id/approve — owner/manager
-router.patch('/:id/approve', protect, authorize('owner', 'manager'), async (req, res) => {
-  const sale = await Sale.findById(req.params.id).populate('items.product');
-  if (!sale) return res.status(404).json({ message: 'Sale not found' });
-  if (sale.status !== 'pending') return res.status(400).json({ message: `Sale is already ${sale.status}` });
-
-  // Reduce inventory for each item
-  for (const item of sale.items) {
-    let inv = await OutletInventory.findOne({ outlet: sale.outlet, product: item.product._id });
-    if (!inv) inv = await OutletInventory.create({ outlet: sale.outlet, product: item.product._id, quantity: 0 });
-
+  // Deduct stock immediately on submission
+  for (const item of saleItems) {
+    let inv = await OutletInventory.findOne({ outlet, product: item.product });
+    if (!inv) inv = await OutletInventory.create({ outlet, product: item.product, quantity: 0 });
     const newQty = Math.max(0, inv.quantity - item.quantity);
     inv.quantity = newQty;
     await inv.save();
 
     await InventoryTransaction.create({
-      outlet: sale.outlet, product: item.product._id,
+      outlet, product: item.product,
       type: 'sale', quantity: item.quantity, balanceAfter: newQty,
       reference: 'sale', referenceId: sale._id,
       performedBy: req.user._id,
     });
   }
 
+  await notifyOwners('sale_pending', 'New Sale — Confirm Payment', `${req.user.name} recorded a sale of ₦${totalAmount.toLocaleString()}. Please confirm payment received.`, outlet, sale._id);
+  await log({ action: 'SALE_CREATED', entity: 'Sale', entityId: sale._id, performedBy: req.user._id, outlet, details: { totalAmount, items: items.length } });
+
+  res.status(201).json(sale);
+});
+
+// PATCH /api/sales/:id/approve — confirms payment received (stock already deducted)
+router.patch('/:id/approve', protect, authorize('owner', 'manager'), async (req, res) => {
+  const sale = await Sale.findById(req.params.id);
+  if (!sale) return res.status(404).json({ message: 'Sale not found' });
+  if (sale.status !== 'pending') return res.status(400).json({ message: `Sale is already ${sale.status}` });
+
   sale.status = 'approved';
   sale.approvedBy = req.user._id;
   sale.approvedAt = new Date();
   await sale.save();
 
-  // Notify worker
-  await Notification.create({ recipient: sale.worker, type: 'sale_approved', title: 'Sale Approved', message: `Your sale of ₦${sale.totalAmount.toLocaleString()} has been approved`, outlet: sale.outlet, referenceId: sale._id });
+  await Notification.create({ recipient: sale.worker, type: 'sale_approved', title: 'Payment Confirmed', message: `Your sale of ₦${sale.totalAmount.toLocaleString()} payment has been confirmed`, outlet: sale.outlet, referenceId: sale._id });
   await log({ action: 'SALE_APPROVED', entity: 'Sale', entityId: sale._id, performedBy: req.user._id, outlet: sale.outlet });
 
-  res.json({ message: 'Sale approved', sale });
+  res.json({ message: 'Payment confirmed', sale });
 });
 
-// PATCH /api/sales/:id/reject — owner/manager
+// PATCH /api/sales/:id/reject — rejects and RESTORES stock
 router.patch('/:id/reject', protect, authorize('owner', 'manager'), async (req, res) => {
   const { reason } = req.body;
-  const sale = await Sale.findById(req.params.id);
+  const sale = await Sale.findById(req.params.id).populate('items.product');
   if (!sale) return res.status(404).json({ message: 'Sale not found' });
   if (sale.status !== 'pending') return res.status(400).json({ message: `Sale is already ${sale.status}` });
+
+  // Restore stock since sale is being rejected
+  for (const item of sale.items) {
+    const inv = await OutletInventory.findOne({ outlet: sale.outlet, product: item.product._id });
+    if (inv) {
+      inv.quantity += item.quantity;
+      await inv.save();
+
+      await InventoryTransaction.create({
+        outlet: sale.outlet, product: item.product._id,
+        type: 'returned', quantity: item.quantity, balanceAfter: inv.quantity,
+        reference: 'sale_rejected', referenceId: sale._id,
+        performedBy: req.user._id,
+      });
+    }
+  }
 
   sale.status = 'rejected';
   sale.rejectedReason = reason || '';
   await sale.save();
 
-  await Notification.create({ recipient: sale.worker, type: 'sale_rejected', title: 'Sale Rejected', message: `Your sale of ₦${sale.totalAmount.toLocaleString()} was rejected${reason ? ': ' + reason : ''}`, outlet: sale.outlet, referenceId: sale._id });
+  await Notification.create({ recipient: sale.worker, type: 'sale_rejected', title: 'Sale Rejected', message: `Your sale of ₦${sale.totalAmount.toLocaleString()} was rejected${reason ? ': ' + reason : ''}. Stock has been restored.`, outlet: sale.outlet, referenceId: sale._id });
   await log({ action: 'SALE_REJECTED', entity: 'Sale', entityId: sale._id, performedBy: req.user._id, outlet: sale.outlet, details: { reason } });
 
-  res.json({ message: 'Sale rejected' });
+  res.json({ message: 'Sale rejected and stock restored' });
 });
 
 module.exports = router;

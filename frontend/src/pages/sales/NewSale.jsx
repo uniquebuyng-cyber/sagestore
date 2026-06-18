@@ -252,7 +252,7 @@ export default function NewSale() {
         <button type="submit" disabled={loading || hasStockError}
           className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold text-base rounded-2xl flex items-center justify-center gap-2 transition-colors shadow-md disabled:shadow-none">
           <ShoppingCart size={20} />
-          {loading ? 'Submitting...' : `Submit Sale · ${fmt(total)}`}
+          {loading ? 'Recording...' : `Record Sale · ${fmt(total)}`}
         </button>
 
       </form>
