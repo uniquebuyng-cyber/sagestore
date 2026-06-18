@@ -228,21 +228,20 @@ function AdminMobileDashboard({ user, mobileData: data, onReload }) {
 
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-700 to-blue-900 rounded-2xl p-5 text-white">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-blue-200 text-sm">{today}</p>
-            <h2 className="text-2xl font-bold mt-0.5">Hi, {user?.name?.split(' ')[0]}</h2>
-            <p className="text-blue-300 text-xs mt-0.5">{user?.role === 'owner' ? 'Store Owner' : 'Manager'}</p>
-          </div>
+        {/* Top row: date + bell */}
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-blue-200 text-sm">{today}</p>
           <button onClick={requestNotifications}
             title={notifGranted ? 'Notifications on' : 'Enable notifications'}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-              notifGranted ? 'bg-white/15 hover:bg-white/25' : 'bg-amber-400/25 border border-amber-300/50 hover:bg-amber-400/40'}`}>
-            {notifGranted
-              ? <Bell size={18} className="text-white" />
-              : <BellOff size={18} className="text-amber-300" />}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+              notifGranted ? 'text-white/60 hover:text-white' : 'text-amber-300 hover:text-amber-200'}`}>
+            {notifGranted ? <Bell size={16} /> : <BellOff size={16} />}
           </button>
         </div>
+
+        {/* Greeting */}
+        <h2 className="text-2xl font-bold">Hi, {user?.name?.split(' ')[0]}</h2>
+        <p className="text-blue-300 text-xs mt-0.5 mb-4">{user?.role === 'owner' ? 'Store Owner' : 'Manager'}</p>
 
         {/* Today / Month toggle */}
         <div className="flex gap-1 bg-white/10 rounded-xl p-1">
