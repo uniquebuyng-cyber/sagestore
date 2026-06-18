@@ -159,7 +159,7 @@ export default function Header({ onMenuClick }) {
 
   return (
     <>
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 safe-top">
         <div className="flex items-center gap-3">
           <button onClick={onMenuClick} className="lg:hidden p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100">
             <Menu size={20} />
