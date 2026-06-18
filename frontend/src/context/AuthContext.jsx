@@ -26,6 +26,12 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  const loginWithData = (token, userData) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -46,7 +52,7 @@ export function AuthProvider({ children }) {
   const canApprove = isOwner || isManager;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser, isOwner, isManager, isWorker, canApprove }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithData, logout, refreshUser, isOwner, isManager, isWorker, canApprove }}>
       {children}
     </AuthContext.Provider>
   );

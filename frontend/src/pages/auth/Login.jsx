@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../api/axios';
 import toast from 'react-hot-toast';
 import { Droplets, Eye, EyeOff, Delete } from 'lucide-react';
+import api from '../../api/axios';
 
 export default function Login() {
   const [mode, setMode] = useState('password'); // 'password' | 'pin'
@@ -12,7 +12,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [pinEmail, setPinEmail] = useState('');
   const [pin, setPin] = useState('');
-  const { login } = useAuth();
+  const { login, loginWithData } = useAuth();
   const navigate = useNavigate();
 
   // Remember last email used for PIN mode
@@ -39,9 +39,9 @@ export default function Login() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/pin-login', { email: pinEmail, pin: enteredPin });
-      localStorage.setItem('token', data.token);
       localStorage.setItem('sage_pin_email', pinEmail);
-      window.location.href = '/dashboard';
+      loginWithData(data.token, data.user);
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Incorrect PIN');
       setPin('');
