@@ -141,4 +141,64 @@ router.get('/worker', protect, async (req, res) => {
   });
 });
 
+// GET /api/dashboard/admin-mobile — mobile admin home data
+router.get('/admin-mobile', protect, authorize('owner', 'manager'), async (req, res) => {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfDay = new Date(startOfDay); endOfDay.setHours(23, 59, 59, 999);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const outletFilter = req.user.role === 'manager' ? { outlet: req.user.outlet } : {};
+
+  const [todayAgg, monthAgg, monthExpAgg, pendingSales, inventory, outletList] = await Promise.all([
+    Sale.aggregate([
+      { $match: { ...outletFilter, status: 'approved', saleDate: { $gte: startOfDay, $lte: endOfDay } } },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, profit: { $sum: '$totalProfit' }, count: { $sum: 1 } } },
+    ]),
+    Sale.aggregate([
+      { $match: { ...outletFilter, status: 'approved', saleDate: { $gte: startOfMonth } } },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, profit: { $sum: '$totalProfit' }, count: { $sum: 1 } } },
+    ]),
+    Expense.aggregate([
+      { $match: { ...outletFilter, status: 'approved', expenseDate: { $gte: startOfMonth } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+    Sale.find({ ...outletFilter, status: 'pending' })
+      .sort({ createdAt: -1 }).limit(10)
+      .populate('outlet', 'name')
+      .populate('worker', 'name')
+      .lean(),
+    OutletInventory.find(outletFilter)
+      .populate('product', 'name image lowStockLevel')
+      .populate('outlet', 'name')
+      .lean(),
+    Outlet.find(outletFilter.outlet ? { _id: outletFilter.outlet } : {}).lean(),
+  ]);
+
+  const lowStock = inventory.filter(i => i.product && i.quantity <= (i.product.lowStockLevel || 5));
+
+  const bestSellersByOutlet = await Promise.all(outletList.map(async (outlet) => {
+    const products = await Sale.aggregate([
+      { $match: { outlet: outlet._id, status: 'approved', saleDate: { $gte: startOfMonth } } },
+      { $unwind: '$items' },
+      { $group: { _id: '$items.product', name: { $first: '$items.productName' }, totalQty: { $sum: '$items.quantity' }, totalRevenue: { $sum: '$items.subtotal' } } },
+      { $sort: { totalQty: -1 } },
+      { $limit: 3 },
+    ]);
+    return { outletId: outlet._id, outletName: outlet.name, products };
+  }));
+
+  const monthExpTotal = monthExpAgg[0]?.total || 0;
+  const monthGrossProfit = monthAgg[0]?.profit || 0;
+
+  res.json({
+    today: { revenue: todayAgg[0]?.revenue || 0, profit: todayAgg[0]?.profit || 0, salesCount: todayAgg[0]?.count || 0 },
+    monthly: { revenue: monthAgg[0]?.revenue || 0, profit: monthGrossProfit, expenses: monthExpTotal, netProfit: monthGrossProfit - monthExpTotal, salesCount: monthAgg[0]?.count || 0 },
+    pendingCount: pendingSales.length,
+    pendingSales,
+    lowStock: lowStock.slice(0, 20),
+    bestSellersByOutlet,
+  });
+});
+
 module.exports = router;
