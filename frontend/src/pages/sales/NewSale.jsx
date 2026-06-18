@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, ShoppingCart, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 const fmt = (n) => `₦${Number(n || 0).toLocaleString()}`;
 
 export default function NewSale() {
   const [products, setProducts] = useState([]);
   const [outlets, setOutlets] = useState([]);
+  const [inventory, setInventory] = useState({}); // productId -> available qty
   const [items, setItems] = useState([{ productId: '', quantity: 1, sellingPrice: 0, productName: '' }]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [customerName, setCustomerName] = useState('');
@@ -23,14 +24,28 @@ export default function NewSale() {
     Promise.all([API.get('/products'), API.get('/outlets')]).then(([pRes, oRes]) => {
       setProducts(pRes.data);
       setOutlets(oRes.data);
-      if (!isOwner && user?.outlet) setOutletId(user.outlet._id || user.outlet);
-      else if (oRes.data.length === 1) setOutletId(oRes.data[0]._id);
+      const oid = !isOwner && user?.outlet ? (user.outlet._id || user.outlet) : (oRes.data.length === 1 ? oRes.data[0]._id : '');
+      if (oid) setOutletId(oid);
     }).catch(() => {});
   }, []);
 
+  // Reload inventory whenever outlet changes
+  useEffect(() => {
+    if (!outletId) { setInventory({}); return; }
+    API.get(`/inventory?outletId=${outletId}`).then(res => {
+      const map = {};
+      res.data.forEach(item => { if (item.product?._id) map[item.product._id] = item.quantity; });
+      setInventory(map);
+    }).catch(() => {});
+  }, [outletId]);
+
+  const getAvailable = (productId) => inventory[productId] ?? null;
+
   const selectProduct = (index, productId) => {
     const product = products.find(p => p._id === productId);
-    setItems(it => it.map((item, i) => i === index ? { ...item, productId, sellingPrice: product?.sellingPrice || 0, productName: product?.name || '' } : item));
+    setItems(it => it.map((item, i) => i === index
+      ? { ...item, productId, sellingPrice: product?.sellingPrice || 0, productName: product?.name || '', quantity: 1 }
+      : item));
   };
 
   const updateItem = (index, field, value) => {
@@ -42,10 +57,22 @@ export default function NewSale() {
 
   const total = items.reduce((s, item) => s + (Number(item.sellingPrice) * Number(item.quantity || 0)), 0);
 
+  // Check if any item has a stock problem
+  const stockErrors = items.map(item => {
+    if (!item.productId) return null;
+    const avail = getAvailable(item.productId);
+    if (avail === null) return null;
+    if (avail === 0) return 'Out of stock';
+    if (Number(item.quantity) > avail) return `Only ${avail} available`;
+    return null;
+  });
+  const hasStockError = stockErrors.some(e => e !== null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!outletId) return toast.error('Please select an outlet');
     if (items.some(i => !i.productId)) return toast.error('Select a product for each item');
+    if (hasStockError) return toast.error('Fix stock issues before submitting');
     setLoading(true);
     try {
       await API.post('/sales', { outletId, items, paymentMethod, customerName, notes });
@@ -80,31 +107,52 @@ export default function NewSale() {
             <h3 className="font-semibold text-gray-800">Items</h3>
             <button type="button" onClick={addItem} className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={14} /> Add Item</button>
           </div>
+
           {items.map((item, i) => {
-            const product = products.find(p => p._id === item.productId);
+            const avail = item.productId ? getAvailable(item.productId) : null;
+            const err = stockErrors[i];
             return (
-              <div key={i} className="grid grid-cols-12 gap-2 items-start">
-                <div className="col-span-5">
-                  <select required className="input text-sm" value={item.productId} onChange={e => selectProduct(i, e.target.value)}>
-                    <option value="">— Product —</option>
-                    {products.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                  </select>
+              <div key={i} className="space-y-1.5">
+                <div className="grid grid-cols-12 gap-2 items-start">
+                  <div className="col-span-5">
+                    <select required className="input text-sm" value={item.productId} onChange={e => selectProduct(i, e.target.value)}>
+                      <option value="">— Product —</option>
+                      {products.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <input type="number" min="1" required
+                      className={`input text-sm ${err ? 'border-red-400 bg-red-50' : ''}`}
+                      placeholder="Qty" value={item.quantity}
+                      onChange={e => updateItem(i, 'quantity', e.target.value)} />
+                  </div>
+                  <div className="col-span-3">
+                    <input type="number" min="0" required className="input text-sm" placeholder="Price"
+                      value={item.sellingPrice} onChange={e => updateItem(i, 'sellingPrice', e.target.value)} />
+                  </div>
+                  <div className="col-span-1 flex items-center justify-center pt-2">
+                    {items.length > 1 && <button type="button" onClick={() => removeItem(i)} className="text-gray-400 hover:text-red-500"><Trash2 size={15} /></button>}
+                  </div>
+                  <div className="col-span-1 pt-2 text-right">
+                    <p className="text-xs text-gray-500 font-medium">{fmt(Number(item.sellingPrice) * Number(item.quantity || 0))}</p>
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  <input type="number" min="1" required className="input text-sm" placeholder="Qty" value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
-                </div>
-                <div className="col-span-3">
-                  <input type="number" min="0" required className="input text-sm" placeholder="Price" value={item.sellingPrice} onChange={e => updateItem(i, 'sellingPrice', e.target.value)} />
-                </div>
-                <div className="col-span-1 flex items-center justify-center pt-2">
-                  {items.length > 1 && <button type="button" onClick={() => removeItem(i)} className="text-gray-400 hover:text-red-500"><Trash2 size={15} /></button>}
-                </div>
-                <div className="col-span-1 pt-2 text-right">
-                  <p className="text-xs text-gray-500 font-medium">{fmt(Number(item.sellingPrice) * Number(item.quantity || 0))}</p>
-                </div>
+
+                {/* Stock status row */}
+                {item.productId && avail !== null && (
+                  err ? (
+                    <div className="flex items-center gap-1.5 text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                      <AlertTriangle size={13} />
+                      {err === 'Out of stock' ? 'This product is out of stock at this outlet' : `Not enough stock — only ${avail} available`}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-600 px-1">{avail} in stock at this outlet</p>
+                  )
+                )}
               </div>
             );
           })}
+
           <div className="pt-3 border-t border-gray-100 flex justify-between">
             <span className="font-semibold text-gray-700">Total</span>
             <span className="text-xl font-bold text-green-600">{fmt(total)}</span>
@@ -134,7 +182,7 @@ export default function NewSale() {
           </div>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary w-full py-3 flex items-center justify-center gap-2">
+        <button type="submit" disabled={loading || hasStockError} className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           <ShoppingCart size={18} />
           {loading ? 'Submitting...' : 'Submit Sale for Approval'}
         </button>

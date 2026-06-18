@@ -77,6 +77,16 @@ router.post('/', protect, async (req, res) => {
     const product = await Product.findById(item.productId);
     if (!product || !product.isActive) return res.status(400).json({ message: `Product not found: ${item.productId}` });
 
+    // Stock availability check
+    const inv = await OutletInventory.findOne({ outlet, product: item.productId });
+    const available = inv?.quantity || 0;
+    if (available === 0) {
+      return res.status(400).json({ message: `"${product.name}" is out of stock at this outlet` });
+    }
+    if (item.quantity > available) {
+      return res.status(400).json({ message: `Only ${available} ${product.unit}(s) of "${product.name}" available in stock` });
+    }
+
     const subtotal = product.sellingPrice * item.quantity;
     const cost = product.costPrice * item.quantity;
     const profit = subtotal - cost;
