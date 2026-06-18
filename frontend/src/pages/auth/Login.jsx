@@ -25,11 +25,12 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(form.email, form.password);
-      navigate('/dashboard');
+      const { data } = await api.post('/auth/login', { email: form.email, password: form.password });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      window.location.href = '/dashboard';
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
-    } finally {
+      toast.error(err.response?.data?.message || 'Login failed. Check your email and password.');
       setLoading(false);
     }
   };
@@ -39,13 +40,13 @@ export default function Login() {
     setLoading(true);
     try {
       const { data } = await api.post('/auth/pin-login', { email: pinEmail, pin: enteredPin });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
       localStorage.setItem('sage_pin_email', pinEmail);
-      loginWithData(data.token, data.user);
-      navigate('/dashboard');
+      window.location.href = '/dashboard';
     } catch (err) {
       toast.error(err.response?.data?.message || 'Incorrect PIN');
       setPin('');
-    } finally {
       setLoading(false);
     }
   };
