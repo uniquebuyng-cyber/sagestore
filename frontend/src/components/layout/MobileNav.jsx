@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Receipt, Boxes, Plus, Package } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Receipt, Boxes, PlusCircle, Package } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function MobileNav() {
@@ -23,10 +23,10 @@ export default function MobileNav() {
             <span>Products</span>
           </NavLink>
 
-          <button onClick={() => navigate('/sales/new')} className="flex flex-col items-center justify-center">
-            <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center shadow-lg -mt-5">
-              <Plus size={26} className="text-white" />
-            </div>
+          <button onClick={() => navigate('/sales/new')}
+            className="flex flex-col items-center justify-center gap-0.5 text-xs font-semibold text-blue-600">
+            <PlusCircle size={22} />
+            <span>Sell</span>
           </button>
 
           <NavLink to="/sales" className={({ isActive }) =>
@@ -54,10 +54,10 @@ export default function MobileNav() {
           <span>Stock</span>
         </NavLink>
 
-        <button onClick={() => navigate('/sales/new')} className="flex flex-col items-center justify-center">
-          <div className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center shadow-lg -mt-5">
-            <Plus size={26} className="text-white" />
-          </div>
+        <button onClick={() => navigate('/sales/new')}
+          className="flex flex-col items-center justify-center gap-0.5 text-xs font-semibold text-blue-600">
+          <PlusCircle size={22} />
+          <span>Sell</span>
         </button>
 
         <NavLink to="/sales" className={({ isActive }) =>
