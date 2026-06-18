@@ -76,7 +76,7 @@ export default function Inventory() {
   const [selectedOutlet, setSelectedOutlet] = useState('');
   const [lowStock, setLowStock] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const { canApprove, user } = useAuth();
+  const { canApprove, isWorker } = useAuth();
 
   const load = async () => {
     try {
@@ -112,7 +112,7 @@ export default function Inventory() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <div className="card"><p className="text-xs text-gray-500 font-medium">Total Stock Value</p><p className="text-2xl font-bold text-gray-900 mt-1">{fmt(totalValue)}</p></div>
+        {!isWorker && <div className="card"><p className="text-xs text-gray-500 font-medium">Total Stock Value</p><p className="text-2xl font-bold text-gray-900 mt-1">{fmt(totalValue)}</p></div>}
         <div className="card"><p className="text-xs text-gray-500 font-medium">Total Items</p><p className="text-2xl font-bold text-gray-900 mt-1">{inventory.length}</p></div>
         <div className="card border-orange-200 bg-orange-50">
           <p className="text-xs text-orange-600 font-medium">Low Stock</p>
@@ -148,7 +148,7 @@ export default function Inventory() {
                   <th className="table-header">Category</th>
                   <th className="table-header">Outlet</th>
                   <th className="table-header text-right">Quantity</th>
-                  <th className="table-header text-right">Stock Value</th>
+                  {!isWorker && <th className="table-header text-right">Stock Value</th>}
                   <th className="table-header">Status</th>
                 </tr>
               </thead>
@@ -167,7 +167,7 @@ export default function Inventory() {
                     <td className="table-cell text-gray-500 capitalize">{item.product?.category?.replace('_', ' ')}</td>
                     <td className="table-cell text-gray-600">{item.outlet?.name || '—'}</td>
                     <td className="table-cell text-right font-semibold">{item.quantity} <span className="text-gray-400 font-normal text-xs">{item.product?.unit}</span></td>
-                    <td className="table-cell text-right text-gray-600">{fmt(item.stockValue)}</td>
+                    {!isWorker && <td className="table-cell text-right text-gray-600">{fmt(item.stockValue)}</td>}
                     <td className="table-cell">
                       {item.isLowStock ? (
                         <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full font-medium">

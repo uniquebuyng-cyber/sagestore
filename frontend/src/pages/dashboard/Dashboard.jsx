@@ -50,32 +50,34 @@ export default function Dashboard() {
 
   if (isWorker) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-xl font-bold text-gray-900">Welcome, {user?.name}</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Link to="/sales/new" className="card hover:shadow-md transition-shadow flex items-center gap-4 bg-blue-600 text-white">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center min-h-[70vh] px-4 space-y-6">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <ShoppingCart size={30} className="text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">Hi, {user?.name?.split(' ')[0]}</h2>
+          <p className="text-gray-500 text-sm mt-1">What would you like to do?</p>
+        </div>
+        <div className="w-full max-w-sm space-y-3">
+          <Link to="/sales/new"
+            className="flex items-center gap-4 p-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl transition-colors shadow-md">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
               <ShoppingCart size={24} />
             </div>
-            <div><p className="font-semibold text-lg">New Sale</p><p className="text-blue-100 text-sm">Record a new sale</p></div>
-          </Link>
-          <Link to="/expenses" className="card hover:shadow-md transition-shadow flex items-center gap-4">
-            <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600">
-              <Receipt size={24} />
+            <div>
+              <p className="font-bold text-lg">Record a Sale</p>
+              <p className="text-blue-100 text-sm">Tap to enter new sale</p>
             </div>
-            <div><p className="font-semibold text-gray-800 text-lg">Expenses</p><p className="text-gray-500 text-sm">Submit expense</p></div>
           </Link>
-          <Link to="/sales" className="card hover:shadow-md transition-shadow flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-green-600">
-              <BarChart2 size={24} />
+          <Link to="/sales"
+            className="flex items-center gap-4 p-5 bg-white border-2 border-gray-100 hover:border-blue-200 rounded-2xl transition-colors shadow-sm">
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center shrink-0">
+              <BarChart2 size={24} className="text-green-600" />
             </div>
-            <div><p className="font-semibold text-gray-800 text-lg">My Sales</p><p className="text-gray-500 text-sm">View your sales</p></div>
-          </Link>
-          <Link to="/inventory" className="card hover:shadow-md transition-shadow flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600">
-              <Package size={24} />
+            <div>
+              <p className="font-bold text-gray-800 text-lg">My Sales</p>
+              <p className="text-gray-500 text-sm">See approved / pending</p>
             </div>
-            <div><p className="font-semibold text-gray-800 text-lg">Inventory</p><p className="text-gray-500 text-sm">Check stock levels</p></div>
           </Link>
         </div>
       </div>
