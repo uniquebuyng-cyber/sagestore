@@ -8,7 +8,7 @@ const productSchema = new mongoose.Schema({
     enum: ['engine_oil', 'gas_accessories', 'auto_accessories'],
   },
   brand: { type: String, trim: true },
-  sku: { type: String, unique: true, trim: true },
+  sku: { type: String, unique: true, sparse: true, trim: true },
   costPrice: { type: Number, required: true, min: 0 },
   sellingPrice: { type: Number, required: true, min: 0 },
   lowStockLevel: { type: Number, default: 5, min: 0 },

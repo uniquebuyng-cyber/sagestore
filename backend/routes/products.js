@@ -35,7 +35,8 @@ router.post('/', protect, authorize('owner', 'manager'), upload.single('image'),
   }
 
   const productData = {
-    name, category, brand, sku, description, unit,
+    name, category, brand, description, unit,
+    sku: sku || undefined,
     costPrice: Number(costPrice),
     sellingPrice: Number(sellingPrice),
     lowStockLevel: Number(lowStockLevel) || 5,
