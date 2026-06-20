@@ -13,6 +13,7 @@ const inventoryTransactionSchema = new mongoose.Schema({
   reference: { type: String, trim: true },
   referenceId: { type: mongoose.Schema.Types.ObjectId },
   notes: { type: String, trim: true },
+  transactionDate: { type: Date, default: Date.now },
   performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 }, { timestamps: true });
 

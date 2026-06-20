@@ -61,17 +61,17 @@ router.get('/transactions', protect, async (req, res) => {
   if (productId) filter.product = productId;
   if (type) filter.type = type;
   if (startDate || endDate) {
-    filter.createdAt = {};
-    if (startDate) filter.createdAt.$gte = new Date(startDate);
-    if (endDate) filter.createdAt.$lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
+    filter.transactionDate = {};
+    if (startDate) filter.transactionDate.$gte = new Date(startDate);
+    if (endDate) filter.transactionDate.$lte = new Date(new Date(endDate).setHours(23, 59, 59, 999));
   }
 
   const total = await InventoryTransaction.countDocuments(filter);
   const transactions = await InventoryTransaction.find(filter)
-    .populate('product', 'name category brand')
+    .populate('product', 'name category brand image unit')
     .populate('outlet', 'name')
     .populate('performedBy', 'name role')
-    .sort({ createdAt: -1 })
+    .sort({ transactionDate: -1 })
     .skip((page - 1) * limit)
     .limit(Number(limit));
 
@@ -80,7 +80,7 @@ router.get('/transactions', protect, async (req, res) => {
 
 // POST /api/inventory/adjust — owner/manager: stock in, adjustment, damaged, returned
 router.post('/adjust', protect, authorize('owner', 'manager'), async (req, res) => {
-  const { outletId, productId, type, quantity, notes } = req.body;
+  const { outletId, productId, type, quantity, notes, date } = req.body;
   if (!outletId || !productId || !type || quantity == null) {
     return res.status(400).json({ message: 'outletId, productId, type, and quantity required' });
   }
@@ -106,6 +106,7 @@ router.post('/adjust', protect, authorize('owner', 'manager'), async (req, res) 
     quantity: Number(quantity),
     balanceAfter: newQty,
     notes,
+    transactionDate: date ? new Date(date) : new Date(),
     performedBy: req.user._id,
   });
 
