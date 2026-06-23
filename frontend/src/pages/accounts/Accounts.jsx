@@ -61,7 +61,7 @@ function AccountModal({ account, onClose, onSaved }) {
         await API.post('/accounts', form);
         toast.success('Account created');
       }
-      onSaved();
+      await onSaved();
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save account');
@@ -133,7 +133,7 @@ function DepositModal({ accounts, preAccount, onClose, onSaved }) {
     try {
       await API.post('/accounts/deposit', form);
       toast.success('Deposit recorded');
-      onSaved();
+      await onSaved();
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to record deposit');
@@ -209,7 +209,7 @@ function WithdrawModal({ accounts, preAccount, onClose, onSaved }) {
     try {
       await API.post('/accounts/withdraw', form);
       toast.success('Withdrawal recorded');
-      onSaved();
+      await onSaved();
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to record withdrawal');
@@ -287,7 +287,7 @@ function TransferModal({ accounts, onClose, onSaved }) {
     try {
       await API.post('/accounts/transfer', form);
       toast.success('Transfer successful');
-      onSaved();
+      await onSaved();
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Transfer failed');

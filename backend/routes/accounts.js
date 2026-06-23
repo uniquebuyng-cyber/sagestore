@@ -175,20 +175,20 @@ router.post('/deposit', protect, authorize('owner'), async (req, res) => {
   const { accountId, amount, description, reference, date } = req.body;
   if (!accountId || !amount) return res.status(400).json({ message: 'Account and amount are required' });
 
-  const account = await Account.findOne({ _id: accountId, owner: req.user._id, isActive: true });
-  if (!account) return res.status(404).json({ message: 'Account not found' });
-
-  const balanceAfter = account.balance + Number(amount);
-  account.balance = balanceAfter;
-  await account.save();
+  const updated = await Account.findOneAndUpdate(
+    { _id: accountId, owner: req.user._id, isActive: true },
+    { $inc: { balance: Number(amount) } },
+    { new: true }
+  );
+  if (!updated) return res.status(404).json({ message: 'Account not found' });
 
   await AccountTransaction.create({
     type: 'deposit', amount: Number(amount), account: accountId,
     description, reference, date: date ? new Date(date) : new Date(),
-    balanceAfter, performedBy: req.user._id,
+    balanceAfter: updated.balance, performedBy: req.user._id,
   });
 
-  res.json({ message: 'Deposit recorded', account });
+  res.json({ message: 'Deposit recorded', account: updated });
 });
 
 // POST /api/accounts/withdraw
@@ -196,24 +196,25 @@ router.post('/withdraw', protect, authorize('owner'), async (req, res) => {
   const { accountId, amount, description, reference, date } = req.body;
   if (!accountId || !amount) return res.status(400).json({ message: 'Account and amount are required' });
 
-  const account = await Account.findOne({ _id: accountId, owner: req.user._id, isActive: true });
-  if (!account) return res.status(404).json({ message: 'Account not found' });
-
-  if (account.balance < Number(amount)) {
-    return res.status(400).json({ message: `Insufficient balance. Available: ₦${account.balance.toLocaleString()}` });
+  const current = await Account.findOne({ _id: accountId, owner: req.user._id, isActive: true });
+  if (!current) return res.status(404).json({ message: 'Account not found' });
+  if (current.balance < Number(amount)) {
+    return res.status(400).json({ message: `Insufficient balance. Available: ₦${current.balance.toLocaleString()}` });
   }
 
-  const balanceAfter = account.balance - Number(amount);
-  account.balance = balanceAfter;
-  await account.save();
+  const updated = await Account.findByIdAndUpdate(
+    accountId,
+    { $inc: { balance: -Number(amount) } },
+    { new: true }
+  );
 
   await AccountTransaction.create({
     type: 'withdrawal', amount: Number(amount), account: accountId,
     description, reference, date: date ? new Date(date) : new Date(),
-    balanceAfter, performedBy: req.user._id,
+    balanceAfter: updated.balance, performedBy: req.user._id,
   });
 
-  res.json({ message: 'Withdrawal recorded', account });
+  res.json({ message: 'Withdrawal recorded', account: updated });
 });
 
 // POST /api/accounts/transfer
@@ -226,38 +227,46 @@ router.post('/transfer', protect, authorize('owner'), async (req, res) => {
     return res.status(400).json({ message: 'Cannot transfer to the same account' });
   }
 
-  const [from, to] = await Promise.all([
-    Account.findOne({ _id: fromAccountId, owner: req.user._id, isActive: true }),
-    Account.findOne({ _id: toAccountId, owner: req.user._id, isActive: true }),
-  ]);
+  const amt = Number(amount);
 
-  if (!from || !to) return res.status(404).json({ message: 'Account not found' });
-  if (from.balance < Number(amount)) {
-    return res.status(400).json({ message: `Insufficient balance in ${from.name}. Available: ₦${from.balance.toLocaleString()}` });
+  // Verify source has enough balance
+  const fromCheck = await Account.findOne({ _id: fromAccountId, owner: req.user._id, isActive: true });
+  if (!fromCheck) return res.status(404).json({ message: 'Source account not found' });
+  if (fromCheck.balance < amt) {
+    return res.status(400).json({ message: `Insufficient balance in ${fromCheck.name}. Available: ₦${fromCheck.balance.toLocaleString()}` });
   }
 
-  const txDate = date ? new Date(date) : new Date();
-  const fromBalanceAfter = from.balance - Number(amount);
-  const toBalanceAfter = to.balance + Number(amount);
+  const toCheck = await Account.findOne({ _id: toAccountId, owner: req.user._id, isActive: true });
+  if (!toCheck) return res.status(404).json({ message: 'Destination account not found' });
 
-  from.balance = fromBalanceAfter;
-  to.balance = toBalanceAfter;
-  await Promise.all([from.save(), to.save()]);
+  const txDate = date ? new Date(date) : new Date();
+
+  // Atomic $inc on both accounts separately — no race condition
+  const updatedFrom = await Account.findByIdAndUpdate(
+    fromAccountId,
+    { $inc: { balance: -amt } },
+    { new: true }
+  );
+  const updatedTo = await Account.findByIdAndUpdate(
+    toAccountId,
+    { $inc: { balance: amt } },
+    { new: true }
+  );
 
   await AccountTransaction.create([
     {
-      type: 'transfer_out', amount: Number(amount), account: fromAccountId,
-      linkedAccount: toAccountId, description: description || `Transfer to ${to.name}`,
-      reference, date: txDate, balanceAfter: fromBalanceAfter, performedBy: req.user._id,
+      type: 'transfer_out', amount: amt, account: fromAccountId,
+      linkedAccount: toAccountId, description: description || `Transfer to ${toCheck.name}`,
+      reference, date: txDate, balanceAfter: updatedFrom.balance, performedBy: req.user._id,
     },
     {
-      type: 'transfer_in', amount: Number(amount), account: toAccountId,
-      linkedAccount: fromAccountId, description: description || `Transfer from ${from.name}`,
-      reference, date: txDate, balanceAfter: toBalanceAfter, performedBy: req.user._id,
+      type: 'transfer_in', amount: amt, account: toAccountId,
+      linkedAccount: fromAccountId, description: description || `Transfer from ${fromCheck.name}`,
+      reference, date: txDate, balanceAfter: updatedTo.balance, performedBy: req.user._id,
     },
   ]);
 
-  res.json({ message: 'Transfer successful', fromAccount: from, toAccount: to });
+  res.json({ message: 'Transfer successful', fromAccount: updatedFrom, toAccount: updatedTo });
 });
 
 module.exports = router;
