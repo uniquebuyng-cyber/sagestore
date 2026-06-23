@@ -368,6 +368,7 @@ function TransferModal({ accounts, onClose, onSaved }) {
 export default function Accounts() {
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [recentTx, setRecentTx] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [txTotal, setTxTotal] = useState(0);
   const [txPage, setTxPage] = useState(1);
@@ -399,6 +400,13 @@ export default function Accounts() {
     } catch {}
   }, [period]);
 
+  const loadRecentTx = useCallback(async () => {
+    try {
+      const { data } = await API.get('/accounts/transactions?page=1&limit=8');
+      setRecentTx(data.transactions || []);
+    } catch {}
+  }, []);
+
   const loadTransactions = useCallback(async (page = 1) => {
     setTxLoading(true);
     try {
@@ -418,18 +426,18 @@ export default function Accounts() {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await Promise.all([loadAccounts(), loadSummary()]);
+      await Promise.all([loadAccounts(), loadSummary(), loadRecentTx()]);
       setLoading(false);
     };
     init();
-  }, [loadAccounts, loadSummary]);
+  }, [loadAccounts, loadSummary, loadRecentTx]);
 
   useEffect(() => {
     if (activeTab === 'transactions') loadTransactions(1);
   }, [activeTab, txFilter, loadTransactions]);
 
   const refresh = async () => {
-    await Promise.all([loadAccounts(), loadSummary()]);
+    await Promise.all([loadAccounts(), loadSummary(), loadRecentTx()]);
     if (activeTab === 'transactions') loadTransactions(txPage);
   };
 
@@ -658,6 +666,58 @@ export default function Accounts() {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Recent Activity */}
+          {accounts.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <h2 className="font-semibold text-gray-900">Recent Activity</h2>
+                <button
+                  onClick={() => setActiveTab('transactions')}
+                  className="text-sm text-blue-600 hover:underline font-medium flex items-center gap-1">
+                  View all <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {recentTx.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No transactions yet. Deposits, withdrawals, and transfers will appear here.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {recentTx.map(tx => (
+                    <div key={tx._id} className="flex items-center justify-between px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${TX_COLORS[tx.type]}`}>
+                          {tx.type === 'deposit' && <ArrowDownCircle size={16} />}
+                          {tx.type === 'withdrawal' && <ArrowUpCircle size={16} />}
+                          {tx.type === 'transfer_in' && <ArrowDownCircle size={16} />}
+                          {tx.type === 'transfer_out' && <ArrowUpCircle size={16} />}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {TX_LABELS[tx.type]}
+                            {tx.linkedAccount && (
+                              <span className="text-gray-400 font-normal"> · {tx.linkedAccount.name}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {tx.account?.name} · {format(new Date(tx.date), 'dd MMM yyyy')}
+                            {tx.description && ` · ${tx.description}`}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`font-semibold text-sm whitespace-nowrap ${
+                        tx.type === 'deposit' || tx.type === 'transfer_in' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {tx.type === 'deposit' || tx.type === 'transfer_in' ? '+' : '−'}{fmt(tx.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
