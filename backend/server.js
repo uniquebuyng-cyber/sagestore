@@ -38,6 +38,7 @@ app.use('/api/workers', require('./routes/workers'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/accounts', require('./routes/accounts'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

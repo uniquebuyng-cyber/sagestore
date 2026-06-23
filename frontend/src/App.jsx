@@ -15,6 +15,7 @@ import Expenses from './pages/expenses/Expenses';
 import Workers from './pages/workers/Workers';
 import Transfers from './pages/transfers/Transfers';
 import Reports from './pages/reports/Reports';
+import Accounts from './pages/accounts/Accounts';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="/workers" element={<ProtectedRoute roles={['owner', 'manager']}><Workers /></ProtectedRoute>} />
         <Route path="/transfers" element={<ProtectedRoute roles={['owner', 'manager']}><Transfers /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute roles={['owner', 'manager']}><Reports /></ProtectedRoute>} />
+        <Route path="/accounts" element={<ProtectedRoute roles={['owner']}><Accounts /></ProtectedRoute>} />
       </Route>
     </Routes>
   );

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingCart, Receipt, Boxes, PlusCircle, Package } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Receipt, Boxes, PlusCircle, Package, Landmark } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function MobileNav() {
@@ -66,10 +66,10 @@ export default function MobileNav() {
           <span>Sales</span>
         </NavLink>
 
-        <NavLink to="/expenses" className={({ isActive }) =>
+        <NavLink to="/accounts" className={({ isActive }) =>
           `flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
-          <Receipt size={20} />
-          <span>Expenses</span>
+          <Landmark size={20} />
+          <span>Accounts</span>
         </NavLink>
       </div>
     </nav>

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard, Store, Package, Boxes, ShoppingCart,
-  Receipt, Users, ArrowLeftRight, BarChart3, X, LogOut, Droplets
+  Receipt, Users, ArrowLeftRight, BarChart3, X, LogOut, Droplets, Landmark,
 } from 'lucide-react';
 
 const ownerNav = [
@@ -16,6 +16,7 @@ const ownerNav = [
   { to: '/transfers', icon: ArrowLeftRight, label: 'Transfers' },
   { to: '/workers', icon: Users, label: 'Workers' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
+  { to: '/accounts', icon: Landmark, label: 'Accounts' },
 ];
 
 const workerNav = [
