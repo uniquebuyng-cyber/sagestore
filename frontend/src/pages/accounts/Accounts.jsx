@@ -3,6 +3,7 @@ import {
   Landmark, Banknote, Smartphone, Wallet, Plus, ArrowLeftRight,
   ArrowDownCircle, ArrowUpCircle, X, ChevronRight, RefreshCw,
   TrendingUp, TrendingDown, CheckCircle, AlertTriangle, Pencil, Trash2,
+  Zap, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import API from '../../api/axios';
 import toast from 'react-hot-toast';
@@ -369,6 +370,8 @@ export default function Accounts() {
   const [accounts, setAccounts] = useState([]);
   const [summary, setSummary] = useState(null);
   const [recentTx, setRecentTx] = useState([]);
+  const [routing, setRouting] = useState({ enabled: false, revenueAccountId: '', profitAccountId: '' });
+  const [routingSaving, setRoutingSaving] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const [txTotal, setTxTotal] = useState(0);
   const [txPage, setTxPage] = useState(1);
@@ -400,6 +403,26 @@ export default function Accounts() {
     } catch {}
   }, [period]);
 
+  const loadRouting = useCallback(async () => {
+    try {
+      const { data } = await API.get('/settings');
+      setRouting({
+        enabled: data.autoRouting?.enabled || false,
+        revenueAccountId: data.autoRouting?.revenueAccountId || '',
+        profitAccountId: data.autoRouting?.profitAccountId || '',
+      });
+    } catch {}
+  }, []);
+
+  const saveRouting = async () => {
+    setRoutingSaving(true);
+    try {
+      await API.put('/settings', { autoRouting: routing });
+      toast.success(routing.enabled ? 'Auto-routing enabled' : 'Auto-routing saved');
+    } catch { toast.error('Failed to save settings'); }
+    finally { setRoutingSaving(false); }
+  };
+
   const loadRecentTx = useCallback(async () => {
     try {
       const { data } = await API.get('/accounts/transactions?page=1&limit=8');
@@ -426,11 +449,11 @@ export default function Accounts() {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
-      await Promise.all([loadAccounts(), loadSummary(), loadRecentTx()]);
+      await Promise.all([loadAccounts(), loadSummary(), loadRecentTx(), loadRouting()]);
       setLoading(false);
     };
     init();
-  }, [loadAccounts, loadSummary, loadRecentTx]);
+  }, [loadAccounts, loadSummary, loadRecentTx, loadRouting]);
 
   useEffect(() => {
     if (activeTab === 'transactions') loadTransactions(1);
@@ -665,6 +688,85 @@ export default function Accounts() {
                     </p>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto-Routing Settings */}
+          {accounts.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <Zap size={18} className={routing.enabled ? 'text-yellow-500' : 'text-gray-400'} />
+                  <h2 className="font-semibold text-gray-900">Auto-Routing When Sales Are Approved</h2>
+                </div>
+                <button
+                  onClick={() => setRouting(r => ({ ...r, enabled: !r.enabled }))}
+                  className={`flex items-center gap-1.5 text-sm font-semibold transition-colors ${routing.enabled ? 'text-blue-600' : 'text-gray-400'}`}>
+                  {routing.enabled
+                    ? <ToggleRight size={28} className="text-blue-600" />
+                    : <ToggleLeft size={28} className="text-gray-400" />}
+                  {routing.enabled ? 'ON' : 'OFF'}
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {routing.enabled && (
+                  <div className="bg-blue-50 rounded-xl px-4 py-3 text-sm text-blue-700">
+                    When you approve a sale: revenue deposits to the <strong>Revenue Account</strong>, then profit is automatically moved to the <strong>Profit Account</strong>.
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                      Revenue Account
+                    </label>
+                    <select
+                      className="input"
+                      value={routing.revenueAccountId}
+                      onChange={e => setRouting(r => ({ ...r, revenueAccountId: e.target.value }))}>
+                      <option value="">— None —</option>
+                      {accounts.map(a => (
+                        <option key={a._id} value={a._id}>{a.name} ({TYPE_LABELS[a.type]})</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Full sale amount deposits here (e.g. Zenith Bank)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                      Profit Account
+                    </label>
+                    <select
+                      className="input"
+                      value={routing.profitAccountId}
+                      onChange={e => setRouting(r => ({ ...r, profitAccountId: e.target.value }))}>
+                      <option value="">— None —</option>
+                      {accounts.map(a => (
+                        <option key={a._id} value={a._id}>{a.name} ({TYPE_LABELS[a.type]})</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Profit portion moves here automatically (e.g. PiggyVest)</p>
+                  </div>
+                </div>
+
+                {routing.enabled && routing.revenueAccountId && routing.profitAccountId &&
+                  routing.revenueAccountId !== routing.profitAccountId && (
+                  <div className="bg-green-50 rounded-xl px-4 py-3 text-sm text-green-700 space-y-1">
+                    <p className="font-semibold">What happens when a sale is approved:</p>
+                    <p>1. Full revenue → <strong>{accounts.find(a => a._id === routing.revenueAccountId)?.name}</strong></p>
+                    <p>2. Profit automatically transferred → <strong>{accounts.find(a => a._id === routing.profitAccountId)?.name}</strong></p>
+                    <p>3. <strong>{accounts.find(a => a._id === routing.revenueAccountId)?.name}</strong> keeps the cost portion for restocking</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={saveRouting}
+                  disabled={routingSaving}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm rounded-xl transition-colors">
+                  {routingSaving ? 'Saving...' : 'Save Routing Settings'}
+                </button>
               </div>
             </div>
           )}

@@ -6,8 +6,87 @@ const OutletInventory = require('../models/OutletInventory');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const Account = require('../models/Account');
+const AccountTransaction = require('../models/AccountTransaction');
+const StoreSettings = require('../models/StoreSettings');
 const { protect, authorize } = require('../middleware/auth');
 const { log } = require('../utils/audit');
+
+async function runAutoRouting(sale, approverId, approverRole) {
+  try {
+    const ownerId = approverRole === 'owner'
+      ? approverId
+      : (await User.findOne({ role: 'owner' }).select('_id'))?._id;
+    if (!ownerId) return;
+
+    const settings = await StoreSettings.findOne({ owner: ownerId });
+    if (!settings?.autoRouting?.enabled) return;
+
+    const { revenueAccountId, profitAccountId } = settings.autoRouting;
+    const now = sale.approvedAt || new Date();
+    const ref = `Sale-${sale._id.toString().slice(-6)}`;
+
+    if (revenueAccountId) {
+      // Deposit full revenue to revenue account (e.g. Zenith)
+      const revAcc = await Account.findByIdAndUpdate(
+        revenueAccountId,
+        { $inc: { balance: sale.totalAmount } },
+        { new: true }
+      );
+      await AccountTransaction.create({
+        type: 'deposit',
+        amount: sale.totalAmount,
+        account: revenueAccountId,
+        description: `Sale approved — revenue`,
+        reference: ref,
+        date: now,
+        balanceAfter: revAcc.balance,
+        performedBy: ownerId,
+      });
+
+      // If a separate profit account is set, transfer profit out of revenue account into it
+      if (profitAccountId && String(profitAccountId) !== String(revenueAccountId) && sale.totalProfit > 0) {
+        const [fromAcc, toAcc] = await Promise.all([
+          Account.findByIdAndUpdate(revenueAccountId, { $inc: { balance: -sale.totalProfit } }, { new: true }),
+          Account.findByIdAndUpdate(profitAccountId, { $inc: { balance: sale.totalProfit } }, { new: true }),
+        ]);
+        await AccountTransaction.create([
+          {
+            type: 'transfer_out', amount: sale.totalProfit,
+            account: revenueAccountId, linkedAccount: profitAccountId,
+            description: `Profit split from sale`, reference: ref,
+            date: now, balanceAfter: fromAcc.balance, performedBy: ownerId,
+          },
+          {
+            type: 'transfer_in', amount: sale.totalProfit,
+            account: profitAccountId, linkedAccount: revenueAccountId,
+            description: `Profit split from sale`, reference: ref,
+            date: now, balanceAfter: toAcc.balance, performedBy: ownerId,
+          },
+        ]);
+      }
+    } else if (profitAccountId) {
+      // Only profit account configured — deposit profit only
+      const profAcc = await Account.findByIdAndUpdate(
+        profitAccountId,
+        { $inc: { balance: sale.totalProfit } },
+        { new: true }
+      );
+      await AccountTransaction.create({
+        type: 'deposit',
+        amount: sale.totalProfit,
+        account: profitAccountId,
+        description: `Sale approved — profit`,
+        reference: ref,
+        date: now,
+        balanceAfter: profAcc.balance,
+        performedBy: ownerId,
+      });
+    }
+  } catch (err) {
+    console.error('Auto-routing error:', err.message);
+  }
+}
 
 async function notifyOwners(type, title, message, outletId, refId) {
   const owners = await User.find({ role: 'owner' });
@@ -152,6 +231,7 @@ router.patch('/:id/approve', protect, authorize('owner', 'manager'), async (req,
   sale.approvedAt = new Date();
   await sale.save();
 
+  await runAutoRouting(sale, req.user._id, req.user.role);
   await Notification.create({ recipient: sale.worker, type: 'sale_approved', title: 'Payment Confirmed', message: `Your sale of ₦${sale.totalAmount.toLocaleString()} payment has been confirmed`, outlet: sale.outlet, referenceId: sale._id });
   await log({ action: 'SALE_APPROVED', entity: 'Sale', entityId: sale._id, performedBy: req.user._id, outlet: sale.outlet });
 
