@@ -655,7 +655,7 @@ export default function Accounts() {
                       Math.abs(summary.difference) < 1 ? 'text-green-700' :
                       summary.difference < 0 ? 'text-red-700' : 'text-yellow-700'
                     }`}>
-                      {summary.difference >= 0 ? '+' : ''}{fmt(summary.difference)}
+                      {Math.abs(summary.difference) < 1 ? '' : summary.difference > 0 ? '+' : '−'}{fmt(Math.abs(summary.difference))}
                     </span>
                   </div>
 
